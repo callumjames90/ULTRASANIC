@@ -9,6 +9,7 @@ public class Main {
 	
 	private static DistanceSensor distanceThread;
 	private static LocationSensor locationThread;
+	private static SanicMusic soundThread;
 	
 	static Navigator nav = new Navigator(SanicPilot.pilot, LocationSensor.poseProvider);
 	
@@ -19,10 +20,11 @@ public class Main {
 		
 		distanceThread = new DistanceSensor();
 		locationThread = new LocationSensor();
+		soundThread = new SanicMusic();
 		
 		distanceThread.start();
 		locationThread.start();
-		
+		soundThread.start();
 		
 		boolean objectDetected = false;
 		boolean scan = true;
@@ -34,7 +36,6 @@ public class Main {
 		boolean adjusted = false;
 		
 		int testint = 0;
-		
 		
 		while(Button.readButtons() != Button.ID_ESCAPE) {
 			if(scan) {
@@ -53,7 +54,7 @@ public class Main {
 				
 				//find and store the distance to the right side of the object
 				if(objectDetected) {
-					if(DistanceSensor.sample[0] < 0.1) { 
+					if(DistanceSensor.sample[0] < 0.5) { 
 						distRight = DistanceSensor.sample[0];
 						if(distMin > distRight) distMin = distRight;
 					} else {
