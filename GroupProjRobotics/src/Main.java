@@ -1,148 +1,93 @@
 import lejos.hardware.Button;
-import lejos.hardware.port.MotorPort;
+import lejos.hardware.lcd.LCD;
 import lejos.robotics.navigation.Navigator;
-import lejos.robotics.navigation.Waypoint;
-import lejos.robotics.pathfinding.Path;
 
 //X = R COS (THETA)
 //Y = R SIN (THETA)
-
-//PROVEN EFFECTIVE RANGE: 0.36f (0.45f with the ball)
-//EFFECTIVE PICKUP RANGE: approx 0.05f (5cm)
-//x = 216.0f
 
 public class Main {
 	
 	private static DistanceSensor distanceThread;
 	private static LocationSensor locationThread;
-	private static Claw claw = new Claw(MotorPort.D);
+	private static SanicMusic soundThread;
+	
 	static Navigator nav = new Navigator(SanicPilot.pilot, LocationSensor.poseProvider);
-	
-	static final float scanSpeed = 5.0f;
-	static final float turnSpeed = 50.0f;
-	
 	
 	public static void main(String[] args) {		
 		
-		SanicPilot.pilot.setAngularSpeed(scanSpeed);
-		SanicPilot.pilot.setLinearSpeed(50);
+		SanicPilot.pilot.setAngularSpeed(10);
+		SanicPilot.pilot.setLinearSpeed(10);
 		
 		distanceThread = new DistanceSensor();
 		locationThread = new LocationSensor();
+		soundThread = new SanicMusic();
 		
 		distanceThread.start();
 		locationThread.start();
+		soundThread.start();
 		
-
-		boolean farScan = true;
-		boolean approachBall = false;
-		boolean closeScan = false;
-		boolean grab = false;
-		boolean goToBox = false;
-		boolean drop = false;
-		boolean goToCenter = false;
+		boolean objectDetected = false;
+		boolean scan = true;
+		float distLeft = 0.0f, angLeft = 0.0f; 
+		float distRight = 0.0f, angRight = 0.0f;
 		
-		boolean pathInit = false;
+		float distMin = 0.0f;
+		float center = 0.0f;
+		boolean adjusted = false;
 		
-		float arenaRadius = 0.65f;
-		float effectiveGrabRange = 0.05f;
-		float destination = 0.0f;
-		float arenaEdge = 700.0f;
-		
-		//float threshhold = 0.003f;
-		
-		float farScanOffset = 100.0f;
-		float closeScanOffset = 0.0f;
-		
-		float minDist = Float.POSITIVE_INFINITY;
-		
-		Path path = new Path();
-		
+		int testint = 0;
 		
 		while(Button.readButtons() != Button.ID_ESCAPE) {
-			
-			if(farScan) {		
+			if(scan) {
+				//slowly rotate the robot
 				if(!SanicPilot.pilot.isMoving()) {
 					SanicPilot.pilot.arcForward(1);
 				}
-				if(DistanceSensor.sample[0] < arenaRadius) {					
-					minDist = DistanceSensor.sample[0];
-					SanicPilot.pilot.stop();	
-					farScan = false;
-					if(minDist < effectiveGrabRange) {
-						minDist = Float.POSITIVE_INFINITY;
-						closeScan = true;
+				
+				//find and store the distance to the left side of the object
+				if(DistanceSensor.sample[0] < 0.1) {
+					distLeft = DistanceSensor.sample[0];
+					distMin = distLeft;
+					angLeft = LocationSensor.pose.getHeading();
+					objectDetected = true;
+				}
+				
+				//find and store the distance to the right side of the object
+				if(objectDetected) {
+					if(DistanceSensor.sample[0] < 0.5) { 
+						distRight = DistanceSensor.sample[0];
+						if(distMin > distRight) distMin = distRight;
 					} else {
-						destination = ((minDist * 1000) - farScanOffset);
-						approachBall = true;			
-					}
-				}
-			}
-			
-			if(approachBall) {
-				if(!SanicPilot.pilot.isMoving()) {
-					SanicPilot.pilot.travel(destination);
-				}
-				approachBall = false;
-				minDist = Float.POSITIVE_INFINITY;
-				closeScan = true;	
-			}	
-			
-			if(closeScan) {
-				if(!SanicPilot.pilot.isMoving()) {
-					SanicPilot.pilot.arcForward(1);
-				}
-				if(DistanceSensor.sample[0] < arenaRadius) {					
-					//minDist = DistanceSensor.sample[0];
-					if(minDist > DistanceSensor.sample[0]) minDist = DistanceSensor.sample[0];
-					if(DistanceSensor.sample[0] > minDist) {
+						angRight = LocationSensor.pose.getHeading();
+						//average the two angles to get the center angle
+						center = (angLeft + angRight) / 2;
+						objectDetected = false;
+						scan = false;
 						SanicPilot.pilot.stop();
-						SanicPilot.pilot.setAngularSpeed(scanSpeed);
-						closeScan = false;
-						grab = true;
 					}
 				}
-			}
-			
-			if(grab) {
-				if(!Claw.isClosed()) {
-					Claw.close();
-				}
-				grab = false;
-				goToBox = true;
-			}
-			
-			if(goToBox) {
-				if(!pathInit) {
-					SanicPilot.pilot.setAngularSpeed(turnSpeed);
-					path.add(new Waypoint(LocationSensor.pose.getX(), 0, 0));
-					path.add(new Waypoint(arenaEdge, 0, 0));
-					pathInit = true;
-					nav.followPath(path);
-				}
-				if(nav.pathCompleted()) {
-					nav.clearPath();
-					goToBox = false;
-					pathInit = false;
-					drop = true;
+			} else {				
+				LCD.drawString("dL: " + Float.toString(distLeft), 0, 0);
+				LCD.drawString("aL: " + Float.toString(angLeft), 0, 1);
+				LCD.drawString("dR: " + Float.toString(distRight), 0, 2);
+				LCD.drawString("aR: " + Float.toString(angRight), 0, 3);
+				LCD.drawString("min: " + Float.toString(distMin), 0, 4);
+				
+				//adjust robot to face the center of the object
+				if(!adjusted) {
+					if(!SanicPilot.pilot.isMoving()) {
+						//float adjustment = center - LocationSensor.pose.getHeading();
+						//SanicPilot.pilot.rotate(adjustment);
+						SanicPilot.pilot.rotate(-10);
+						adjusted = true;
+					}				
+				} else {
+					LCD.drawString("center: " + Float.toString(center), 0, 5);
+					LCD.drawString("pose: " + LocationSensor.pose.toString(), 0, 6);
+					//move to object
+					//grab object
 				}
 			}
-			
-			if(drop) {
-				if(Claw.isClosed()) {
-					Claw.open();
-				}
-				destination = -arenaEdge;
-				drop = false;
-			}
-			
-			if(goToCenter) {
-				if(!SanicPilot.pilot.isMoving()) {
-					SanicPilot.pilot.travel(destination);
-				}
-				//do second scan or some shit
-				goToCenter = false;
-			}			
-		}			
+		}
 	}
 }
