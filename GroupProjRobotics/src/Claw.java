@@ -8,17 +8,16 @@ public class Claw {
 	public Claw(Port clawPort) {
 		closed = false;
 		clawMotor = new NXTRegulatedMotor(clawPort);
-		clawMotor.setSpeed(clawMotor.getMaxSpeed());
 		this.prime();
 	}
 	
 	public void close() {	
-		clawMotor.rotate(-190);
+		clawMotor.rotate(-200);
 		closed = true;
 	}
 	
 	public void open() {
-		clawMotor.rotate(190);
+		clawMotor.rotate(180);
 		closed = false;
 	}
 	
@@ -27,9 +26,7 @@ public class Claw {
 	}
 	
 	private void prime() {
-		while(!clawMotor.isStalled()) {
-			clawMotor.forward();
-		}
+		clawMotor.rotate(360);
 	}
 }
 
