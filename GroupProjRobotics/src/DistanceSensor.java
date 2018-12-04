@@ -14,7 +14,7 @@ public class DistanceSensor extends Thread {
 	public void run() {
 		while (true) {
 			sp.fetchSample(sample, 0);
-			//LCD.drawString(Float.toString(sample[0]), 0, 0);			
+			LCD.drawString(Float.toString(sample[0]), 0, 0);			
 		}
 	}
 
